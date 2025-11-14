@@ -222,7 +222,8 @@ header {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #ffffff; /* axis labels white */
+  color: #ffffff;
+  fill: #ffffff; /* SVG text */
 }
 
 #map-extra {
@@ -233,6 +234,13 @@ header {
 /* NAMES + SCATTER */
 .names-top {
   margin-bottom: 0.7rem;
+}
+
+.names-top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 #bar-chart-container {
