@@ -51,14 +51,23 @@
       </div>
     </header>
 
-    <!-- GLOBAL FILTERS -->
+    <!-- TOP FILTERS: MASSACRE/DATE + VICTIM NAME -->
     <section class="filters-card">
-      <div class="filter-group">
-        <label id="year-label" for="year-select">Ano</label>
-        <select id="year-select">
-          <option value="all">Todos os anos</option>
-          <!-- options filled by JS -->
-        </select>
+      <div class="filter-group full-width">
+        <label id="massacre-filter-label" for="filter-massacre">Massacre / Data</label>
+        <input
+          id="filter-massacre"
+          type="text"
+          placeholder="Filtrar por massacre ou data"
+        />
+      </div>
+      <div class="filter-group full-width">
+        <label id="victim-filter-label" for="filter-victim">Nome da vítima</label>
+        <input
+          id="filter-victim"
+          type="text"
+          placeholder="Filtrar por nome da vítima"
+        />
       </div>
     </section>
 
@@ -76,12 +85,18 @@
         </p>
       </div>
 
+      <!-- MAP FILTERS: GOVERNOR + YEAR (ONLY FOR MAP) -->
       <div class="map-filters">
         <div class="filter-group">
           <label id="gov-label" for="governor-select">Governador</label>
           <select id="governor-select">
             <option value="all">Todos os Governadores</option>
-            <!-- governors filled by JS -->
+          </select>
+        </div>
+        <div class="filter-group">
+          <label id="year-label" for="year-select">Ano</label>
+          <select id="year-select">
+            <option value="all">Todos os anos</option>
           </select>
         </div>
       </div>
