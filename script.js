@@ -1,6 +1,6 @@
 // ===== GLOBAL STATE =====
 let dataAll = [];
-let dataTextFiltered = [];   // after massacre/date + victim filters
+let dataTextFiltered = [];   // after massacre dropdown + victim text filters
 let dataMapFiltered = [];    // text filters + year + governor
 
 let lang = "pt";
@@ -8,7 +8,7 @@ let selectedMassacreMap = null;
 let selectedMassacreBar = null;
 
 // filters
-let massacreFilterText = "";
+let massacreFilterId = "all";
 let victimFilterText = "";
 let mapYearFilter = "all";
 let governorFilter = "all";
@@ -42,7 +42,6 @@ function setLanguage(newLang) {
     document.getElementById(enId).classList.toggle("hidden", showPT);
   });
 
-  // labels / placeholders
   document.getElementById("year-label").textContent =
     lang === "pt" ? "Ano" : "Year";
 
@@ -62,10 +61,11 @@ function setLanguage(newLang) {
 
   document.getElementById("massacre-filter-label").textContent =
     lang === "pt" ? "Massacre / Data" : "Massacre / Date";
-  document.getElementById("filter-massacre").placeholder =
-    lang === "pt"
-      ? "Filtrar por massacre ou data"
-      : "Filter by massacre or date";
+  const massacreSelect = document.getElementById("filter-massacre");
+  if (massacreSelect.options.length > 0) {
+    massacreSelect.options[0].text =
+      lang === "pt" ? "Todos os massacres" : "All massacres";
+  }
 
   document.getElementById("victim-filter-label").textContent =
     lang === "pt" ? "Nome da vítima" : "Victim name";
@@ -74,8 +74,12 @@ function setLanguage(newLang) {
       ? "Filtrar por nome da vítima"
       : "Filter by victim name";
 
-  const clearBtn = document.getElementById("clear-map-selection");
-  clearBtn.textContent =
+  const clearMapBtn = document.getElementById("clear-map-selection");
+  clearMapBtn.textContent =
+    lang === "pt" ? "Limpar seleção" : "Clear selection";
+
+  const clearScatterBtn = document.getElementById("clear-scatter-selection");
+  clearScatterBtn.textContent =
     lang === "pt" ? "Limpar seleção" : "Clear selection";
 
   document.getElementById("btn-pt").classList.toggle("active", lang === "pt");
@@ -108,23 +112,20 @@ function splitNames(namesStr) {
 }
 
 function getLinkFromCsvRow(row) {
-  // new column name
+  // updated column name
   return row["WikiFavelas Source Link"] || "";
 }
 
 // ===== FILTERING =====
 function applyTextFilters() {
-  const m = massacreFilterText.trim().toLowerCase();
   const v = victimFilterText.trim().toLowerCase();
 
   dataTextFiltered = dataAll.filter((d) => {
     let okM = true;
     let okV = true;
 
-    if (m) {
-      const dateStr = d.Date ? d.Date.toLocaleDateString("pt-BR") : "";
-      const combined = `${d.MassacreName} ${dateStr}`.toLowerCase();
-      okM = combined.includes(m);
+    if (massacreFilterId !== "all") {
+      okM = d.id === massacreFilterId;
     }
 
     if (v) {
@@ -172,25 +173,42 @@ d3.csv("Massacres in Rio de Janeiro 1990-2025 - English.csv").then((data) => {
   });
 
   applySpatialJitter(dataAll);
-  applyTextFilters();
-  applyMapFilters();
-
   initTopFilters();
   populateYearSelect();
   populateGovernorSelect();
+
+  applyTextFilters();
+  applyMapFilters();
+
   initMapLeaflet();
   initScatterChart();
+  initClearScatterSelection();
   updateVisuals();
   setLanguage("pt");
 });
 
 // ===== TOP FILTER INPUTS =====
 function initTopFilters() {
-  const massacreInput = document.getElementById("filter-massacre");
+  const massacreSelect = document.getElementById("filter-massacre");
   const victimInput = document.getElementById("filter-victim");
 
-  massacreInput.addEventListener("input", () => {
-    massacreFilterText = massacreInput.value.toLowerCase();
+  // populate massacre dropdown by date
+  const massacresSorted = dataAll
+    .slice()
+    .sort((a, b) => (a.Date || 0) - (b.Date || 0));
+  massacresSorted.forEach((row) => {
+    const opt = document.createElement("option");
+    opt.value = row.id;
+    const dateLabel = row.Date
+      ? row.Date.toLocaleDateString("pt-BR")
+      : "";
+    opt.textContent = `${row.MassacreName} — ${dateLabel}`;
+    massacreSelect.appendChild(opt);
+  });
+
+  massacreSelect.addEventListener("change", () => {
+    const val = massacreSelect.value;
+    massacreFilterId = val === "all" ? "all" : +val;
     selectedMassacreMap = null;
     selectedMassacreBar = null;
     applyTextFilters();
@@ -454,13 +472,23 @@ function renderMapSidePanel() {
   container.appendChild(namesDiv);
 
   const link = row.LinkWiki;
+  const desc = lang === "pt" ? row.DescriptionPT : row.DescriptionEN;
+  const notes = lang === "pt" ? row.NotesPT : row.NotesEN;
+
+  let html = "";
   if (link) {
-    const html =
+    html +=
       lang === "pt"
         ? `<p><a href="${link}" target="_blank">Ver mais na WikiFavelas</a></p>`
         : `<p><a href="${link}" target="_blank">See more on WikiFavelas</a></p>`;
-    extra.innerHTML = html;
   }
+  if (desc) {
+    html += `<h4>${lang === "pt" ? "Descrição" : "Description"}</h4><p>${desc}</p>`;
+  }
+  if (notes) {
+    html += `<h4>${lang === "pt" ? "Observações" : "Notes"}</h4><p>${notes}</p>`;
+  }
+  extra.innerHTML = html;
 }
 
 // ===== SCATTER PLOT: UNIT DOT GRAPH (1 DOT PER VICTIM) =====
@@ -508,7 +536,7 @@ function buildVictimPoints() {
 function updateScatterChart() {
   scatterSvg.selectAll("*").remove();
 
-  const margin = { top: 20, right: 20, bottom: 60, left: 40 };
+  const margin = { top: 20, right: 60, bottom: 60, left: 40 };
   const innerWidth = scatterWidth - margin.left - margin.right;
   const innerHeight = scatterHeight - margin.top - margin.bottom;
 
@@ -533,9 +561,6 @@ function updateScatterChart() {
   const dates = victimPoints.map((d) => d.date);
   xScale = d3.scaleTime().domain(d3.extent(dates)).range([0, innerWidth]).nice();
 
-  const maxStack = d3.max(victimPoints, (d) => d.stackIndex) || 1;
-  const dotSpacing = Math.max(3, innerHeight / (maxStack + 5));
-
   const xAxis = d3.axisBottom(xScale).ticks(8);
 
   const xAxisG = g
@@ -550,9 +575,9 @@ function updateScatterChart() {
     .style("text-anchor", "end")
     .attr("fill", "#ffffff");
 
-  g.selectAll(".x-axis .domain, .x-axis .tick line").attr("stroke", "#888");
+  xAxisG.selectAll(".domain, .tick line").attr("stroke", "#888");
 
-  // x-axis label
+  // x-axis label (white, via class)
   g.append("text")
     .attr("x", innerWidth / 2)
     .attr("y", innerHeight + 45)
@@ -560,7 +585,8 @@ function updateScatterChart() {
     .attr("class", "small-label")
     .text(lang === "pt" ? "Data do massacre" : "Date of massacre");
 
-  // no y-axis drawn (unit dot stacks only)
+  const dotRadius = 3;
+  const dotSpacing = 2 * dotRadius + 2; // ensures no vertical overlap
 
   const tooltip = d3
     .select("body")
@@ -577,8 +603,8 @@ function updateScatterChart() {
     .append("circle")
     .attr("class", "victim-point")
     .attr("cx", (d) => xScale(d.date))
-    .attr("cy", (d) => innerHeight - d.stackIndex * dotSpacing)
-    .attr("r", 3)
+    .attr("cy", (d) => innerHeight - 5 - d.stackIndex * dotSpacing)
+    .attr("r", dotRadius)
     .attr("fill", (d) => colorCatScale(d.category))
     .attr("opacity", 0.85)
     .on("mouseover", function (event, d) {
@@ -609,8 +635,8 @@ function updateScatterChart() {
       renderNamesList();
     });
 
-  // Legend for victim type colors
-  const legend = g.append("g").attr("transform", `translate(${innerWidth - 170},10)`);
+  // Legend for victim type colors (shifted further right, outside plot area)
+  const legend = g.append("g").attr("transform", `translate(${innerWidth + 10},10)`);
   const legendTitle =
     lang === "pt" ? "Cor: tipo de vítima" : "Color: victim type";
   legend
@@ -661,7 +687,16 @@ function updateScatterChart() {
   scatterSvg.call(zoom);
 }
 
-// ===== NAMES LIST (· separated) =====
+// ===== CLEAR SCATTER SELECTION =====
+function initClearScatterSelection() {
+  const btn = document.getElementById("clear-scatter-selection");
+  btn.addEventListener("click", () => {
+    selectedMassacreBar = null;
+    renderNamesList();
+  });
+}
+
+// ===== NAMES LIST (· separated, shows name matches) =====
 function renderNamesList() {
   const titleEl = document.getElementById("names-title");
   const subtitleEl = document.getElementById("names-subtitle");
@@ -674,6 +709,15 @@ function renderNamesList() {
     dataTextFiltered.forEach((d) => {
       allNames = allNames.concat(splitNames(d.NamesRaw));
     });
+
+    // If victim filter, keep only matching names
+    const v = victimFilterText.trim().toLowerCase();
+    if (v) {
+      allNames = allNames.filter((name) =>
+        name.toLowerCase().includes(v)
+      );
+    }
+
     allNames = Array.from(new Set(allNames));
 
     titleEl.textContent =
@@ -682,8 +726,8 @@ function renderNamesList() {
         : "All victims (current filter)";
     subtitleEl.textContent =
       lang === "pt"
-        ? "Clique em um ponto para filtrar por massacre."
-        : "Click a point to filter by massacre.";
+        ? "Digite um nome para filtrar ou clique em um ponto para ver um massacre específico."
+        : "Type a name to filter, or click a point to see a specific massacre.";
 
     listEl.textContent = allNames.join(" · ");
   } else {
@@ -708,8 +752,8 @@ function renderNamesList() {
 
     subtitleEl.textContent =
       lang === "pt"
-        ? "Clique em outro ponto para mudar o massacre ou recarregue a página para limpar."
-        : "Click another point to change massacre or reload the page to clear.";
+        ? "Clique em outro ponto para mudar o massacre ou use 'Limpar seleção'."
+        : "Click another point to change massacre or use 'Clear selection'.";
 
     listEl.textContent = namesStr;
   }
