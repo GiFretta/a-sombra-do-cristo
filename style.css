@@ -260,7 +260,8 @@ header {
 
 #bar-chart {
   width: 100%;
-  height: 1150px;
+  height: auto;    /* use intrinsic SVG height */
+  display: block;
 }
 
 /* NECROPOLITICS */
