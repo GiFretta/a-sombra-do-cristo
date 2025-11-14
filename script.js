@@ -140,7 +140,7 @@ d3.csv("Massacres in Rio de Janeiro 1990-2025 - English.csv").then((data) => {
   initMapLeaflet();
   initScatterChart();
   updateVisuals();
-  setLanguage("pt"); // initial language
+  setLanguage("pt");
 });
 
 // ===== FILTER CONTROLS =====
@@ -230,7 +230,7 @@ function initMapLeaflet() {
     scrollWheelZoom: true,
   });
 
-  // Light, simple basemap (similar to the JSON style you sent)
+  // Light, simple basemap (similar to style JSON you sent)
   L.tileLayer(
     "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
     {
@@ -525,7 +525,6 @@ function updateScatterChart() {
     .attr("class", "small-label")
     .text(lang === "pt" ? "Tipo de vítima" : "Victim type");
 
-  // Tooltip
   const tooltip = d3
     .select("body")
     .selectAll(".tooltip.scatter-tooltip")
@@ -534,7 +533,6 @@ function updateScatterChart() {
     .attr("class", "tooltip scatter-tooltip")
     .style("opacity", 0);
 
-  // Points
   const points = g
     .selectAll(".victim-point")
     .data(victimPoints)
@@ -582,7 +580,7 @@ function updateScatterChart() {
       renderNamesList();
     });
 
-  // Color legend for victim type
+  // Legend for victim type colors
   const legend = g.append("g").attr("transform", `translate(${innerWidth - 150},10)`);
   const legendTitle =
     lang === "pt" ? "Cor: tipo de vítima" : "Color: victim type";
