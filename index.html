@@ -55,11 +55,10 @@
     <section class="filters-card">
       <div class="filter-group full-width">
         <label id="massacre-filter-label" for="filter-massacre">Massacre / Data</label>
-        <input
-          id="filter-massacre"
-          type="text"
-          placeholder="Filtrar por massacre ou data"
-        />
+        <select id="filter-massacre">
+          <option value="all">Todos os massacres</option>
+          <!-- options filled by JS -->
+        </select>
       </div>
       <div class="filter-group full-width">
         <label id="victim-filter-label" for="filter-victim">Nome da vítima</label>
@@ -132,7 +131,10 @@
       </div>
 
       <div class="names-top">
-        <h3 id="names-title"></h3>
+        <div class="names-top-header">
+          <h3 id="names-title"></h3>
+          <button id="clear-scatter-selection" class="clear-btn"></button>
+        </div>
         <p id="names-subtitle" class="small-label"></p>
         <div id="names-list" class="names-box"></div>
       </div>
