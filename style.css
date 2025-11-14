@@ -1,12 +1,25 @@
 :root {
-  --bg: #f1dfbc;
-  --primary: #f44d1f;
-  --secondary: #516c94;
-  --accent-red: #fb1213;
-  --deep-red: #a31e1f;
-  --dark-brown: #681201;
-  --soft-orange: #f97542;
-  --muted-gray: #625555;
+  /* Palette extracted from your image */
+  --dark-1: #272122;
+  --dark-2: #2e4263;
+  --mid-1: #776768;
+  --red-1: #681201;
+  --red-2: #8f0b0b;
+  --red-3: #b83334;
+  --red-4: #fd2021;
+  --red-5: #f8413e;
+  --orange-1: #ea4400;
+  --orange-2: #fd6323;
+  --blue-1: #455f84;
+  --blue-2: #5e79a4;
+  --sand: #f1dfbc;
+  --gold: #cf9329;
+
+  --bg: var(--dark-1);
+  --card-bg: #332b2c;
+  --card-border: #4a3e3f;
+  --names-bg: #2b2425;
+  --muted: #bfb5b5;
 }
 
 * {
@@ -17,7 +30,7 @@ body {
   margin: 0;
   font-family: "Roboto", sans-serif;
   background-color: var(--bg);
-  color: #222;
+  color: #ffffff;
 }
 
 #app {
@@ -28,59 +41,78 @@ body {
 
 /* HEADER */
 header {
+  text-align: center;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1.2rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .title-block h1 {
   margin: 0;
-  color: var(--dark-brown);
+  color: #ffffff;
+  font-family: "Oswald", sans-serif;
+  font-weight: 600;
+  font-size: 2rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-.title-block p {
-  margin: 0.3rem 0 0;
+.subtitle {
+  margin: 0.4rem 0 0;
+  font-family: "Oswald", sans-serif;
   font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--sand);
 }
 
+/* LANG TOGGLE */
 .lang-toggle {
   display: flex;
   gap: 0.4rem;
 }
 
 .lang-btn {
-  border: 1px solid var(--muted-gray);
-  background-color: #fff8f0;
-  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--mid-1);
+  background-color: transparent;
+  padding: 0.35rem 0.8rem;
   border-radius: 999px;
   font-size: 0.85rem;
   cursor: pointer;
+  color: #ffffff;
 }
 .lang-btn.active {
-  background-color: var(--primary);
-  color: #fff;
-  border-color: var(--primary);
+  background-color: var(--orange-2);
+  color: #000;
+  border-color: var(--orange-2);
 }
 
 /* CARDS */
 .section-card,
 .filters-card {
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: var(--card-bg);
   border-radius: 12px;
   padding: 1rem 1.2rem;
   margin-bottom: 1rem;
-  border: 1px solid #e0d2b5;
+  border: 1px solid var(--card-border);
 }
 
 .section-header h2 {
   margin: 0 0 0.3rem;
-  color: var(--dark-brown);
+  color: var(--sand);
+  font-family: "Oswald", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .section-header p {
   margin: 0 0 0.5rem;
+  color: var(--muted);
 }
 
 /* FILTERS */
@@ -94,11 +126,15 @@ header {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted-gray);
+  color: var(--muted);
 }
 .filter-group select {
   margin-top: 0.2rem;
   padding: 0.25rem 0.5rem;
+  background-color: var(--names-bg);
+  color: #fff;
+  border-radius: 4px;
+  border: 1px solid var(--card-border);
 }
 
 /* MAP LAYOUT */
@@ -114,17 +150,27 @@ header {
   height: 420px;
   border-radius: 10px;
   overflow: hidden;
+  background-color: #1b1819;
+}
+
+#map-svg {
+  width: 100%;
+  height: 100%;
 }
 
 /* SIDE PANEL */
 .side-panel h3 {
   margin-top: 0;
+  font-family: "Oswald", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sand);
 }
 
 .names-box {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: var(--names-bg);
   border-radius: 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--card-border);
   padding: 0.6rem 0.8rem;
   max-height: 230px;
   overflow-y: auto;
@@ -144,7 +190,7 @@ header {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted-gray);
+  color: var(--muted);
 }
 
 #map-extra {
@@ -170,6 +216,25 @@ header {
 /* NECROPOLITICS */
 .placeholder {
   font-style: italic;
+  color: var(--muted);
+}
+
+/* D3 Tooltip */
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: #1d191a;
+  color: #fff;
+  border: 1px solid #5a4b4d;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+
+/* Legend */
+.legend {
+  font-size: 0.8rem;
+  fill: #ffffff;
 }
 
 /* UTIL */
@@ -180,8 +245,7 @@ header {
 /* Responsive */
 @media (max-width: 900px) {
   header {
-    flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .map-layout {
