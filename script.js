@@ -494,7 +494,7 @@ function renderMapSidePanel() {
 // ===== SCATTER PLOT: UNIT DOT GRAPH (1 DOT PER VICTIM) =====
 let scatterSvg;
 let scatterWidth = 900;
-let scatterHeight = 400;
+let scatterHeight = 1150;
 let xScale, colorCatScale;
 
 function initScatterChart() {
@@ -536,7 +536,7 @@ function buildVictimPoints() {
 function updateScatterChart() {
   scatterSvg.selectAll("*").remove();
 
-  const margin = { top: 20, right: 60, bottom: 60, left: 40 };
+  const margin = { top: 20, right: 160, bottom: 60, left: 40 };
   const innerWidth = scatterWidth - margin.left - margin.right;
   const innerHeight = scatterHeight - margin.top - margin.bottom;
 
@@ -608,18 +608,18 @@ function updateScatterChart() {
     .attr("fill", (d) => colorCatScale(d.category))
     .attr("opacity", 0.85)
     .on("mouseover", function (event, d) {
-      const victimsLabel = lang === "pt" ? "Vítima" : "Victim";
-      const govLabel = lang === "pt" ? "Governador" : "Governor";
       const typeLabel = lang === "pt" ? "Tipo" : "Type";
+      const totalLabel = lang === "pt" ? "Total de vítimas" : "Total victims";
+      const govLabel = lang === "pt" ? "Governador" : "Governor";
       const link = d.row.LinkWiki;
-
+    
       let html = `<strong>${d.massacreName}</strong><br/>`;
       if (d.date) html += `${d.date.toLocaleDateString("pt-BR")}<br/>`;
-      html += `${victimsLabel}: ${d.category}<br/>`;
       html += `${typeLabel}: ${d.category}<br/>`;
+      html += `${totalLabel}: ${d.row.TotalVictims}<br/>`;
       html += `${govLabel}: ${d.row.Governor}`;
       if (link) html += `<br/><a href="${link}" target="_blank">WikiFavelas</a>`;
-
+    
       tooltip.html(html).style("opacity", 0.95);
     })
     .on("mousemove", function (event) {
