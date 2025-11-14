@@ -1,7 +1,6 @@
 // ===== GLOBAL STATE =====
 let dataAll = [];
 let dataFiltered = [];
-let rioGeoJson = null;
 let lang = "pt";
 let selectedMassacreMap = null;
 let selectedMassacreBar = null;
@@ -76,13 +75,8 @@ function getLinkFromCsvRow(row) {
   );
 }
 
-// ===== LOAD DATA + GEOJSON =====
-Promise.all([
-  d3.csv("Massacres in Rio de Janeiro 1990-2025 - English.csv"),
-  d3.json("rio_metro.geojson"), // <-- put your Rio metro GeoJSON here
-]).then(([data, geo]) => {
-  rioGeoJson = geo;
-
+// ===== LOAD DATA (CSV only) =====
+d3.csv("Massacres in Rio de Janeiro 1990-2025 - English.csv").then((data) => {
   dataAll = data.map((d, idx) => {
     const dateObj = parseDate(d["Date"]);
     const year = dateObj ? dateObj.getFullYear() : null;
@@ -109,7 +103,7 @@ Promise.all([
     };
   });
 
-  // jitter for overlapping massacres (about 50m radius)
+  // jitter overlapping massacres (~50m radius)
   applySpatialJitter(dataAll);
 
   dataFiltered = dataAll.slice();
@@ -161,7 +155,7 @@ function applySpatialJitter(data) {
     groups.get(key).push(d);
   });
 
-  const jitterDistanceDeg = 0.0005; // ~50m in lat
+  const jitterDistanceDeg = 0.0005; // ~50m
 
   groups.forEach((group) => {
     if (group.length === 1) {
@@ -178,51 +172,50 @@ function applySpatialJitter(data) {
   });
 }
 
-// ===== MAP (D3 + GEOJSON) =====
-let mapSvg, mapProjection, mapPath, mapRadiusScale, mapColorScale;
+// ===== MAP (D3, SIMPLE DARK BACKGROUND) =====
+let mapSvg, mapProjection, mapRadiusScale, mapColorScale;
 
 function initMapD3() {
+  const container = document.getElementById("map");
+  const width = container.clientWidth || 600;
+  const height = container.clientHeight || 400;
+
   mapSvg = d3.select("#map-svg");
+  mapSvg.attr("width", width).attr("height", height);
 
-  const width = parseInt(mapSvg.style("width"), 10) || 600;
-  const height = parseInt(mapSvg.style("height"), 10) || 400;
-
+  // Center on Rio and zoom in
   mapProjection = d3
     .geoMercator()
-    .fitSize([width, height], rioGeoJson);
-
-  mapPath = d3.geoPath().projection(mapProjection);
+    .center([-43.2, -22.9]) // lon, lat for Rio
+    .scale(65000) // you can tweak this
+    .translate([width / 2, height / 2]);
 
   const maxVictims = d3.max(dataAll, (d) => d.TotalVictims) || 1;
   mapRadiusScale = d3.scaleSqrt().domain([1, maxVictims]).range([4, 20]);
 
   const governors = Array.from(new Set(dataAll.map((d) => d.Governor)));
-  mapColorScale = d3
-    .scaleOrdinal()
-    .domain(governors)
-    .range(d3.schemeSet2);
+  mapColorScale = d3.scaleOrdinal().domain(governors).range(d3.schemeSet2);
 
-  // dark background polygon
+  // dark rectangle as base
   mapSvg
-    .append("g")
-    .selectAll("path")
-    .data(rioGeoJson.features)
-    .enter()
-    .append("path")
-    .attr("d", mapPath)
-    .attr("fill", "#1b1819")
-    .attr("stroke", "#4a3e3f")
-    .attr("stroke-width", 0.6);
+    .append("rect")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("width", width)
+    .attr("height", height)
+    .attr("fill", "#1b1819");
 
-  // add groups for circles + legend
   mapSvg.append("g").attr("class", "bubbles-layer");
   mapSvg.append("g").attr("class", "size-legend");
   mapSvg.append("g").attr("class", "color-legend");
 }
 
 function updateMap() {
-  const width = parseInt(mapSvg.style("width"), 10) || 600;
-  const height = parseInt(mapSvg.style("height"), 10) || 400;
+  const container = document.getElementById("map");
+  const width = container.clientWidth || 600;
+  const height = container.clientHeight || 400;
+
+  mapSvg.attr("width", width).attr("height", height);
 
   const bubblesLayer = mapSvg.select(".bubbles-layer");
 
@@ -282,8 +275,12 @@ function updateMap() {
 
   circlesEnter
     .merge(circles)
-    .attr("cx", (d) => mapProjection([d.LonJitter || d.Longitude, d.LatJitter || d.Latitude])[0])
-    .attr("cy", (d) => mapProjection([d.LonJitter || d.Longitude, d.LatJitter || d.Latitude])[1])
+    .attr("cx", (d) =>
+      mapProjection([d.LonJitter || d.Longitude, d.LatJitter || d.Latitude])[0]
+    )
+    .attr("cy", (d) =>
+      mapProjection([d.LonJitter || d.Longitude, d.LatJitter || d.Latitude])[1]
+    )
     .attr("r", (d) =>
       d.TotalVictims > 0 ? mapRadiusScale(d.TotalVictims) : mapRadiusScale(1)
     )
@@ -297,14 +294,10 @@ function drawSizeLegend(width, height) {
   const legend = mapSvg.select(".size-legend");
   legend.selectAll("*").remove();
 
-  const radii = [5, 15, 25].map((px) =>
-    (mapRadiusScale.invert ? mapRadiusScale.invert(px) : px)
-  );
-
   const x = 70;
   const y = height - 110;
 
-  const circleValues = [5, 15, 30]; // victim counts just for explanation
+  const circleValues = [5, 15, 30]; // example victim counts
 
   circleValues.forEach((val, i) => {
     const r = mapRadiusScale(val);
@@ -434,7 +427,7 @@ function renderMapSidePanel() {
   extra.innerHTML = html;
 }
 
-// ===== STACKED BAR CHART (D3) =====
+// ===== STACKED BAR CHART (unchanged logic, dark theme) =====
 let barSvg;
 let barWidth = 900;
 let barHeight = 400;
@@ -517,7 +510,6 @@ function updateBarChart() {
     .attr("class", "small-label")
     .text(lang === "pt" ? "Número de vítimas" : "Number of victims");
 
-  // Bars
   const seriesGroup = g
     .selectAll(".series")
     .data(stackedSeries)
@@ -547,8 +539,7 @@ function updateBarChart() {
       const victimsLabel = lang === "pt" ? "Vítimas" : "Victims";
       const govLabel = lang === "pt" ? "Governador" : "Governor";
 
-      const desc =
-        lang === "pt" ? row.DescriptionPT : row.DescriptionEN;
+      const desc = lang === "pt" ? row.DescriptionPT : row.DescriptionEN;
       const notes = lang === "pt" ? row.NotesPT : row.NotesEN;
       const link = row.LinkWiki;
 
@@ -577,7 +568,6 @@ function updateBarChart() {
       renderNamesList();
     });
 
-  // Dots for each individual name
   const victimsDots = [];
   staggered.forEach((row) => {
     const namesArr = splitNames(row.NamesRaw);
