@@ -204,7 +204,7 @@ header {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted);
+  color: #ffffff; /* axis labels white */
 }
 
 #map-extra {
@@ -219,7 +219,7 @@ header {
 
 #bar-chart-container {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: auto; /* sideways scroll */
 }
 
 #bar-chart {
