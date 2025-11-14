@@ -11,6 +11,19 @@
     rel="stylesheet"
   />
 
+  <!-- Leaflet (map tiles + zoom) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
   <!-- D3 -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
 
@@ -63,35 +76,43 @@
         </p>
       </div>
 
-      <div class="map-layout">
-        <div id="map">
-          <svg id="map-svg"></svg>
+      <div class="map-filters">
+        <div class="filter-group">
+          <label id="gov-label" for="governor-select">Governador</label>
+          <select id="governor-select">
+            <option value="all">Todos os Governadores</option>
+            <!-- governors filled by JS -->
+          </select>
         </div>
+      </div>
+
+      <div class="map-layout">
+        <div id="map"></div>
 
         <aside class="side-panel">
-          <h3 id="map-victims-title-pt">Vítimas (clique em um ponto)</h3>
-          <h3 id="map-victims-title-en" class="hidden">Victims (click a point)</h3>
+          <div class="side-panel-header">
+            <h3 id="map-victims-title-pt">Vítimas (clique em um ponto)</h3>
+            <h3 id="map-victims-title-en" class="hidden">Victims (click a point)</h3>
+            <button id="clear-map-selection" class="clear-btn"></button>
+          </div>
 
           <div id="map-victims-content" class="names-box"></div>
-
           <div id="map-extra"></div>
         </aside>
       </div>
     </section>
 
-    <!-- STACKED BAR CHART + NAMES LIST -->
+    <!-- SCATTER PLOT + NAMES LIST -->
     <section class="section-card">
       <div class="section-header">
-        <h2 id="bar-title-pt">Massacres ao longo do tempo</h2>
-        <h2 id="bar-title-en" class="hidden">Massacres over time</h2>
+        <h2 id="bar-title-pt">Vítimas ao longo do tempo</h2>
+        <h2 id="bar-title-en" class="hidden">Victims over time</h2>
 
         <p id="bar-desc-pt">
-          Barras empilhadas mostram os tipos de vítimas em cada massacre.
-          Clique em uma barra para ver apenas os nomes daquele massacre.
+          Cada ponto representa uma vítima, colorida por tipo. Use o zoom e a rolagem lateral para explorar os massacres.
         </p>
         <p id="bar-desc-en" class="hidden">
-          Stacked bars show victim types in each massacre.
-          Click a bar to see only the names from that massacre.
+          Each dot represents a victim, colored by type. Use zoom and horizontal scroll to explore massacres.
         </p>
       </div>
 
