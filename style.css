@@ -107,8 +107,15 @@ header {
   font-family: "Oswald", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+/* NECROPOLITICS TITLES MATCH MAP TITLES */
+#necro-title-pt,
+#necro-title-en {
+  font-family: "Oswald", sans-serif;
+  color: var(--sand);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 0;
 }
-
 .section-header p {
   margin: 0 0 0.5rem;
   color: var(--muted);
