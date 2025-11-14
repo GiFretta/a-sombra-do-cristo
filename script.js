@@ -494,7 +494,7 @@ function renderMapSidePanel() {
 // ===== SCATTER PLOT: UNIT DOT GRAPH (1 DOT PER VICTIM) =====
 let scatterSvg;
 let scatterWidth = 900;
-let scatterHeight = 1150;
+let scatterHeight = 1100;
 let xScale, colorCatScale;
 
 function initScatterChart() {
