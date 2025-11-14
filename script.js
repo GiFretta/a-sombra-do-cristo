@@ -5,6 +5,9 @@ let lang = "pt";
 let selectedMassacreMap = null;
 let selectedMassacreBar = null;
 
+let yearFilter = "all";
+let governorFilter = "all";
+
 const victimCategories = [
   "Enforced Dissapearances",
   "Victims of State/Police Action",
@@ -36,6 +39,24 @@ function setLanguage(newLang) {
 
   document.getElementById("year-label").textContent =
     lang === "pt" ? "Ano" : "Year";
+
+  const yearSelect = document.getElementById("year-select");
+  if (yearSelect.options.length > 0) {
+    yearSelect.options[0].text =
+      lang === "pt" ? "Todos os anos" : "All years";
+  }
+
+  const govLabel = document.getElementById("gov-label");
+  govLabel.textContent = lang === "pt" ? "Governador" : "Governor";
+  const govSelect = document.getElementById("governor-select");
+  if (govSelect.options.length > 0) {
+    govSelect.options[0].text =
+      lang === "pt" ? "Todos os Governadores" : "All Governors";
+  }
+
+  const clearBtn = document.getElementById("clear-map-selection");
+  clearBtn.textContent =
+    lang === "pt" ? "Limpar seleção" : "Clear selection";
 
   document.getElementById("btn-pt").classList.toggle("active", lang === "pt");
   document.getElementById("btn-en").classList.toggle("active", lang === "en");
@@ -75,7 +96,15 @@ function getLinkFromCsvRow(row) {
   );
 }
 
-// ===== LOAD DATA (CSV only) =====
+function applyFilters() {
+  dataFiltered = dataAll.filter((d) => {
+    const yearOk = yearFilter === "all" || d.Year === yearFilter;
+    const govOk = governorFilter === "all" || d.Governor === governorFilter;
+    return yearOk && govOk;
+  });
+}
+
+// ===== LOAD DATA =====
 d3.csv("Massacres in Rio de Janeiro 1990-2025 - English.csv").then((data) => {
   dataAll = data.map((d, idx) => {
     const dateObj = parseDate(d["Date"]);
@@ -103,18 +132,18 @@ d3.csv("Massacres in Rio de Janeiro 1990-2025 - English.csv").then((data) => {
     };
   });
 
-  // jitter overlapping massacres (~50m radius)
   applySpatialJitter(dataAll);
-
-  dataFiltered = dataAll.slice();
+  applyFilters();
 
   populateYearSelect();
-  initMapD3();
-  initBarChart();
+  populateGovernorSelect();
+  initMapLeaflet();
+  initScatterChart();
   updateVisuals();
+  setLanguage("pt"); // initial language
 });
 
-// ===== YEAR FILTER =====
+// ===== FILTER CONTROLS =====
 function populateYearSelect() {
   const select = document.getElementById("year-select");
   const yearsSet = new Set(
@@ -133,19 +162,37 @@ function populateYearSelect() {
 
   select.addEventListener("change", () => {
     const val = select.value;
-    if (val === "all") {
-      dataFiltered = dataAll.slice();
-    } else {
-      const yearVal = +val;
-      dataFiltered = dataAll.filter((d) => d.Year === yearVal);
-    }
+    yearFilter = val === "all" ? "all" : +val;
     selectedMassacreMap = null;
     selectedMassacreBar = null;
+    applyFilters();
     updateVisuals();
   });
 }
 
-// ===== SPATIAL JITTER FOR OVERLAPS =====
+function populateGovernorSelect() {
+  const select = document.getElementById("governor-select");
+  const governorsSet = new Set(dataAll.map((d) => d.Governor));
+  const governors = Array.from(governorsSet).sort();
+
+  governors.forEach((g) => {
+    const opt = document.createElement("option");
+    opt.value = g;
+    opt.textContent = g;
+    select.appendChild(opt);
+  });
+
+  select.addEventListener("change", () => {
+    const val = select.value;
+    governorFilter = val === "all" ? "all" : val;
+    selectedMassacreMap = null;
+    selectedMassacreBar = null;
+    applyFilters();
+    updateVisuals();
+  });
+}
+
+// ===== SPATIAL JITTER FOR OVERLAPS (about 50m) =====
 function applySpatialJitter(data) {
   const groups = new Map();
 
@@ -172,205 +219,146 @@ function applySpatialJitter(data) {
   });
 }
 
-// ===== MAP (D3, SIMPLE DARK BACKGROUND) =====
-let mapSvg, mapProjection, mapRadiusScale, mapColorScale;
+// ===== MAP: LEAFLET + LIGHT BASEMAP =====
+let map;
+let circlesLayer;
+let radiusScale;
+let colorScale;
 
-function initMapD3() {
-  const container = document.getElementById("map");
-  const width = container.clientWidth || 600;
-  const height = container.clientHeight || 400;
+function initMapLeaflet() {
+  map = L.map("map", {
+    scrollWheelZoom: true,
+  });
 
-  mapSvg = d3.select("#map-svg");
-  mapSvg.attr("width", width).attr("height", height);
+  // Light, simple basemap (similar to the JSON style you sent)
+  L.tileLayer(
+    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    {
+      maxZoom: 18,
+      attribution: "&copy; OpenStreetMap & Carto",
+    }
+  ).addTo(map);
 
-  // Center on Rio and zoom in
-  mapProjection = d3
-    .geoMercator()
-    .center([-43.2, -22.9]) // lon, lat for Rio
-    .scale(65000) // you can tweak this
-    .translate([width / 2, height / 2]);
+  const rioCenter = [-22.9, -43.2];
+  map.setView(rioCenter, 10);
+
+  const southWest = L.latLng(-23.2, -43.8);
+  const northEast = L.latLng(-22.4, -42.7);
+  map.setMaxBounds(L.latLngBounds(southWest, northEast));
+
+  circlesLayer = L.layerGroup().addTo(map);
 
   const maxVictims = d3.max(dataAll, (d) => d.TotalVictims) || 1;
-  mapRadiusScale = d3.scaleSqrt().domain([1, maxVictims]).range([4, 20]);
+  radiusScale = d3.scaleSqrt().domain([1, maxVictims]).range([4, 20]);
 
   const governors = Array.from(new Set(dataAll.map((d) => d.Governor)));
-  mapColorScale = d3.scaleOrdinal().domain(governors).range(d3.schemeSet2);
+  colorScale = d3.scaleOrdinal().domain(governors).range(d3.schemeSet2);
 
-  // dark rectangle as base
-  mapSvg
-    .append("rect")
-    .attr("x", 0)
-    .attr("y", 0)
-    .attr("width", width)
-    .attr("height", height)
-    .attr("fill", "#1b1819");
-
-  mapSvg.append("g").attr("class", "bubbles-layer");
-  mapSvg.append("g").attr("class", "size-legend");
-  mapSvg.append("g").attr("class", "color-legend");
+  addLeafletLegends();
+  initClearMapSelection();
 }
 
 function updateMap() {
-  const container = document.getElementById("map");
-  const width = container.clientWidth || 600;
-  const height = container.clientHeight || 400;
+  circlesLayer.clearLayers();
 
-  mapSvg.attr("width", width).attr("height", height);
+  dataFiltered.forEach((d) => {
+    if (!d.Latitude || !d.Longitude) return;
 
-  const bubblesLayer = mapSvg.select(".bubbles-layer");
+    const radius =
+      d.TotalVictims > 0 ? radiusScale(d.TotalVictims) : radiusScale(1);
 
-  const tooltip = d3
-    .select("body")
-    .selectAll(".tooltip.map-tooltip")
-    .data([null])
-    .join("div")
-    .attr("class", "tooltip map-tooltip")
-    .style("opacity", 0);
-
-  const circles = bubblesLayer.selectAll("circle").data(dataFiltered, (d) => d.id);
-
-  circles.exit().remove();
-
-  const circlesEnter = circles
-    .enter()
-    .append("circle")
-    .attr("stroke", "#111")
-    .attr("stroke-width", 0.6)
-    .attr("fill-opacity", 0.9)
-    .style("cursor", "pointer")
-    .on("mouseover", function (event, d) {
-      const victimsLabel = lang === "pt" ? "Vítimas" : "Victims";
-      const govLabel = lang === "pt" ? "Governador" : "Governor";
-
-      let html = `<strong>${d.MassacreName}</strong><br/>`;
-      if (d.Date) {
-        html += `${d.Date.toLocaleDateString("pt-BR")}<br/>`;
+    const circle = L.circleMarker(
+      [d.LatJitter || d.Latitude, d.LonJitter || d.Longitude],
+      {
+        radius: radius,
+        color: "#111",
+        weight: 0.7,
+        fillOpacity: 0.9,
+        fillColor: colorScale(d.Governor),
       }
-      html += `${victimsLabel}: ${d.TotalVictims}<br/>${govLabel}: ${d.Governor}`;
+    );
 
-      const link = d.LinkWiki;
-      const desc = lang === "pt" ? d.DescriptionPT : d.DescriptionEN;
-      const notes = lang === "pt" ? d.NotesPT : d.NotesEN;
+    const victimsLabel = lang === "pt" ? "Vítimas" : "Victims";
+    const govLabel = lang === "pt" ? "Governador" : "Governor";
+    const desc = lang === "pt" ? d.DescriptionPT : d.DescriptionEN;
+    const notes = lang === "pt" ? d.NotesPT : d.NotesEN;
+    const link = d.LinkWiki;
 
-      if (link) {
-        html += `<br/><a href="${link}" target="_blank">WikiFavelas</a>`;
-      }
-      if (desc) html += `<br/><small>${desc}</small>`;
-      if (notes) html += `<br/><small><em>${notes}</em></small>`;
+    let html = `<strong>${d.MassacreName}</strong><br/>`;
+    if (d.Date) html += `${d.Date.toLocaleDateString("pt-BR")}<br/>`;
+    html += `${victimsLabel}: ${d.TotalVictims}<br/>${govLabel}: ${d.Governor}`;
+    if (link) html += `<br/><a href="${link}" target="_blank">WikiFavelas</a>`;
+    if (desc) html += `<br/><small>${desc}</small>`;
+    if (notes) html += `<br/><small><em>${notes}</em></small>`;
 
-      tooltip.html(html).style("opacity", 0.95);
-    })
-    .on("mousemove", function (event) {
-      tooltip
-        .style("left", event.pageX + 10 + "px")
-        .style("top", event.pageY + 10 + "px");
-    })
-    .on("mouseout", function () {
-      tooltip.style("opacity", 0);
-    })
-    .on("click", function (event, d) {
+    circle.bindTooltip(html, {
+      direction: "top",
+      offset: [0, -2],
+      opacity: 0.95,
+      sticky: true,
+      className: "leaflet-tooltip-own",
+    });
+
+    circle.on("click", () => {
       selectedMassacreMap = d.id;
       renderMapSidePanel();
     });
 
-  circlesEnter
-    .merge(circles)
-    .attr("cx", (d) =>
-      mapProjection([d.LonJitter || d.Longitude, d.LatJitter || d.Latitude])[0]
-    )
-    .attr("cy", (d) =>
-      mapProjection([d.LonJitter || d.Longitude, d.LatJitter || d.Latitude])[1]
-    )
-    .attr("r", (d) =>
-      d.TotalVictims > 0 ? mapRadiusScale(d.TotalVictims) : mapRadiusScale(1)
-    )
-    .attr("fill", (d) => mapColorScale(d.Governor));
-
-  drawSizeLegend(width, height);
-  drawColorLegend(width, height);
-}
-
-function drawSizeLegend(width, height) {
-  const legend = mapSvg.select(".size-legend");
-  legend.selectAll("*").remove();
-
-  const x = 70;
-  const y = height - 110;
-
-  const circleValues = [5, 15, 30]; // example victim counts
-
-  circleValues.forEach((val, i) => {
-    const r = mapRadiusScale(val);
-    const cy = y - r * 2 - i * 10;
-
-    legend
-      .append("circle")
-      .attr("cx", x)
-      .attr("cy", cy)
-      .attr("r", r)
-      .attr("fill", "none")
-      .attr("stroke", "#ffffff");
-
-    legend
-      .append("line")
-      .attr("x1", x)
-      .attr("x2", x + 40)
-      .attr("y1", cy - r)
-      .attr("y2", cy - r)
-      .attr("stroke", "#ffffff")
-      .attr("stroke-dasharray", "2,2");
-
-    legend
-      .append("text")
-      .attr("x", x + 45)
-      .attr("y", cy - r + 3)
-      .attr("class", "legend")
-      .text(val);
-  });
-
-  legend
-    .append("text")
-    .attr("x", x)
-    .attr("y", y + 10)
-    .attr("class", "legend")
-    .text(lang === "pt" ? "Tamanho: nº de vítimas" : "Size: # of victims");
-}
-
-function drawColorLegend(width, height) {
-  const legend = mapSvg.select(".color-legend");
-  legend.selectAll("*").remove();
-
-  const governors = mapColorScale.domain();
-  const xStart = width - 150;
-  const yStart = 20;
-
-  legend
-    .append("text")
-    .attr("x", xStart)
-    .attr("y", yStart)
-    .attr("class", "legend")
-    .text(lang === "pt" ? "Cor: governador" : "Color: governor");
-
-  governors.forEach((g, i) => {
-    const y = yStart + 18 + i * 16;
-
-    legend
-      .append("rect")
-      .attr("x", xStart)
-      .attr("y", y - 9)
-      .attr("width", 12)
-      .attr("height", 12)
-      .attr("fill", mapColorScale(g));
-
-    legend
-      .append("text")
-      .attr("x", xStart + 18)
-      .attr("y", y)
-      .attr("class", "legend")
-      .text(g);
+    circlesLayer.addLayer(circle);
   });
 }
 
+function addLeafletLegends() {
+  // Size legend
+  const sizeLegend = L.control({ position: "bottomleft" });
+  sizeLegend.onAdd = function () {
+    const div = L.DomUtil.create("div", "legend-box");
+    const label =
+      lang === "pt" ? "Tamanho: nº de vítimas" : "Size: # of victims";
+    div.innerHTML = `<div class="legend-title">${label}</div>`;
+    const values = [5, 15, 30];
+    values.forEach((v) => {
+      const r = radiusScale(v);
+      div.innerHTML += `
+        <div class="legend-row">
+          <span class="legend-circle" style="width:${2 *
+            r}px;height:${2 * r}px;"></span>
+          <span>${v}</span>
+        </div>`;
+    });
+    return div;
+  };
+  sizeLegend.addTo(map);
+
+  // Color legend
+  const colorLegend = L.control({ position: "topright" });
+  colorLegend.onAdd = function () {
+    const div = L.DomUtil.create("div", "legend-box");
+    const title =
+      lang === "pt" ? "Cor: governador" : "Color: governor";
+    div.innerHTML = `<div class="legend-title">${title}</div>`;
+    colorScale.domain().forEach((g) => {
+      const color = colorScale(g);
+      div.innerHTML += `
+        <div class="legend-row">
+          <span class="legend-color-box" style="background:${color};"></span>
+          <span>${g}</span>
+        </div>`;
+    });
+    return div;
+  };
+  colorLegend.addTo(map);
+}
+
+function initClearMapSelection() {
+  const btn = document.getElementById("clear-map-selection");
+  btn.addEventListener("click", () => {
+    selectedMassacreMap = null;
+    renderMapSidePanel();
+  });
+}
+
+// ===== MAP SIDE PANEL =====
 function renderMapSidePanel() {
   const container = document.getElementById("map-victims-content");
   const extra = document.getElementById("map-extra");
@@ -378,17 +366,17 @@ function renderMapSidePanel() {
   extra.innerHTML = "";
 
   if (selectedMassacreMap == null) {
-    container.innerHTML =
+    container.textContent =
       lang === "pt"
-        ? "<p>Clique em um ponto no mapa para ver os nomes.</p>"
-        : "<p>Click a point on the map to see the names.</p>";
+        ? "Clique em um ponto no mapa para ver os nomes."
+        : "Click a point on the map to see the names.";
     return;
   }
 
   const row = dataFiltered.find((d) => d.id === selectedMassacreMap);
   if (!row) {
-    container.innerHTML =
-      lang === "pt" ? "<p>Massacre não encontrado.</p>" : "<p>Massacre not found.</p>";
+    container.textContent =
+      lang === "pt" ? "Massacre não encontrado." : "Massacre not found.";
     return;
   }
 
@@ -397,15 +385,14 @@ function renderMapSidePanel() {
     row.Date ? row.Date.toLocaleDateString("pt-BR") : ""
   }`;
 
-  const ul = document.createElement("ul");
-  splitNames(row.NamesRaw).forEach((name) => {
-    const li = document.createElement("li");
-    li.textContent = name;
-    ul.appendChild(li);
-  });
+  const namesArr = splitNames(row.NamesRaw);
+  const namesStr = namesArr.join(" | ");
+
+  const namesDiv = document.createElement("div");
+  namesDiv.textContent = namesStr;
 
   container.appendChild(titleDiv);
-  container.appendChild(ul);
+  container.appendChild(namesDiv);
 
   const link = row.LinkWiki;
   const desc = lang === "pt" ? row.DescriptionPT : row.DescriptionEN;
@@ -427,36 +414,64 @@ function renderMapSidePanel() {
   extra.innerHTML = html;
 }
 
-// ===== STACKED BAR CHART (unchanged logic, dark theme) =====
-let barSvg;
-let barWidth = 900;
-let barHeight = 400;
-let xScale, yScale, colorCatScale, stackGen;
+// ===== SCATTER PLOT: 1 DOT PER VICTIM =====
+let scatterSvg;
+let scatterWidth = 900;
+let scatterHeight = 400;
+let xScale, yScale, colorCatScale;
 
-function initBarChart() {
-  barSvg = d3.select("#bar-chart");
-  barSvg.attr("width", barWidth).attr("height", barHeight);
+function initScatterChart() {
+  scatterSvg = d3.select("#bar-chart");
+  scatterSvg.attr("width", scatterWidth).attr("height", scatterHeight);
 
   colorCatScale = d3
     .scaleOrdinal()
     .domain(victimCategories)
     .range(["#f8413e", "#ea4400", "#455f84", "#cf9329"]);
-
-  stackGen = d3.stack().keys(victimCategories);
 }
 
-function updateBarChart() {
-  barSvg.selectAll("*").remove();
+function buildVictimPoints() {
+  const victims = [];
 
-  const margin = { top: 20, right: 20, bottom: 60, left: 50 };
-  const innerWidth = barWidth - margin.left - margin.right;
-  const innerHeight = barHeight - margin.top - margin.bottom;
+  dataFiltered.forEach((row) => {
+    if (!row.Date) return;
 
-  const g = barSvg
+    const names = splitNames(row.NamesRaw);
+    const totalNames = names.length || 1;
+
+    victimCategories.forEach((cat) => {
+      const count = row[cat] || 0;
+      for (let i = 0; i < count; i++) {
+        const name = names[i % totalNames];
+        victims.push({
+          massacreId: row.id,
+          date: row.Date,
+          category: cat,
+          name,
+          massacreName: row.MassacreName,
+          row,
+        });
+      }
+    });
+  });
+
+  return victims;
+}
+
+function updateScatterChart() {
+  scatterSvg.selectAll("*").remove();
+
+  const margin = { top: 20, right: 20, bottom: 60, left: 80 };
+  const innerWidth = scatterWidth - margin.left - margin.right;
+  const innerHeight = scatterHeight - margin.top - margin.bottom;
+
+  const g = scatterSvg
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  if (!dataFiltered.length) {
+  const victimPoints = buildVictimPoints();
+
+  if (!victimPoints.length) {
     g.append("text")
       .attr("x", innerWidth / 2)
       .attr("y", innerHeight / 2)
@@ -468,87 +483,86 @@ function updateBarChart() {
     return;
   }
 
-  const staggered = dataFiltered
-    .filter((d) => d.Date)
-    .sort((a, b) => a.Date - b.Date);
+  const dates = victimPoints.map((d) => d.date);
+  xScale = d3.scaleTime().domain(d3.extent(dates)).range([0, innerWidth]).nice();
 
-  const stackedSeries = stackGen(staggered);
-
-  const xExtent = d3.extent(staggered, (d) => d.Date);
-  xScale = d3.scaleTime().domain(xExtent).range([0, innerWidth]).nice();
-
-  const maxTotal = d3.max(staggered, (d) =>
-    victimCategories.reduce((sum, c) => sum + (d[c] || 0), 0)
-  );
   yScale = d3
-    .scaleLinear()
-    .domain([0, maxTotal || 1])
+    .scaleBand()
+    .domain(victimCategories)
     .range([innerHeight, 0])
-    .nice();
+    .padding(0.4);
 
   const xAxis = d3.axisBottom(xScale).ticks(8);
-  const yAxis = d3.axisLeft(yScale).ticks(5);
+  const yAxis = d3.axisLeft(yScale);
 
-  g.append("g")
+  const xAxisG = g
+    .append("g")
     .attr("transform", `translate(0,${innerHeight})`)
-    .call(xAxis)
+    .attr("class", "x-axis")
+    .call(xAxis);
+
+  xAxisG
     .selectAll("text")
     .attr("transform", "rotate(-35)")
     .style("text-anchor", "end")
     .attr("fill", "#ffffff");
 
-  g.append("g")
-    .call(yAxis)
-    .selectAll("text")
-    .attr("fill", "#ffffff");
+  g.append("text")
+    .attr("x", innerWidth / 2)
+    .attr("y", innerHeight + 45)
+    .attr("text-anchor", "middle")
+    .attr("class", "small-label")
+    .text(lang === "pt" ? "Data do massacre" : "Date of massacre");
 
-  g.selectAll(".domain, .tick line").attr("stroke", "#888");
+  const yAxisG = g.append("g").attr("class", "y-axis").call(yAxis);
+
+  yAxisG.selectAll("text").attr("fill", "#ffffff");
+  yAxisG.selectAll(".domain, .tick line").attr("stroke", "#888");
 
   g.append("text")
     .attr("x", -margin.left + 5)
     .attr("y", -6)
     .attr("class", "small-label")
-    .text(lang === "pt" ? "Número de vítimas" : "Number of victims");
+    .text(lang === "pt" ? "Tipo de vítima" : "Victim type");
 
-  const seriesGroup = g
-    .selectAll(".series")
-    .data(stackedSeries)
-    .enter()
-    .append("g")
-    .attr("fill", (d) => colorCatScale(d.key));
-
+  // Tooltip
   const tooltip = d3
     .select("body")
-    .selectAll(".tooltip.bar-tooltip")
+    .selectAll(".tooltip.scatter-tooltip")
     .data([null])
     .join("div")
-    .attr("class", "tooltip bar-tooltip")
+    .attr("class", "tooltip scatter-tooltip")
     .style("opacity", 0);
 
-  seriesGroup
-    .selectAll("rect")
-    .data((d) => d)
+  // Points
+  const points = g
+    .selectAll(".victim-point")
+    .data(victimPoints)
     .enter()
-    .append("rect")
-    .attr("x", (d) => xScale(d.data.Date) - 6)
-    .attr("width", 12)
-    .attr("y", (d) => yScale(d[1]))
-    .attr("height", (d) => yScale(d[0]) - yScale(d[1]))
+    .append("circle")
+    .attr("class", "victim-point")
+    .attr("cx", (d) => xScale(d.date))
+    .attr("cy", (d) => {
+      const base = yScale(d.category) + yScale.bandwidth() / 2;
+      const jitter = (Math.random() - 0.5) * yScale.bandwidth() * 0.6;
+      return base + jitter;
+    })
+    .attr("r", 3)
+    .attr("fill", (d) => colorCatScale(d.category))
+    .attr("opacity", 0.8)
     .on("mouseover", function (event, d) {
-      const row = d.data;
-      const victimsLabel = lang === "pt" ? "Vítimas" : "Victims";
+      const victimsLabel = lang === "pt" ? "Vítima" : "Victim";
       const govLabel = lang === "pt" ? "Governador" : "Governor";
+      const nameLabel = lang === "pt" ? "Nome" : "Name";
+      const desc = lang === "pt" ? d.row.DescriptionPT : d.row.DescriptionEN;
+      const notes = lang === "pt" ? d.row.NotesPT : d.row.NotesEN;
+      const link = d.row.LinkWiki;
 
-      const desc = lang === "pt" ? row.DescriptionPT : row.DescriptionEN;
-      const notes = lang === "pt" ? row.NotesPT : row.NotesEN;
-      const link = row.LinkWiki;
-
-      let html = `<strong>${row.MassacreName}</strong><br/>`;
-      if (row.Date) html += `${row.Date.toLocaleDateString("pt-BR")}<br/>`;
-      html += `${victimsLabel}: ${row.TotalVictims}<br/>${govLabel}: ${
-        row.Governor
-      }`;
-
+      let html = `<strong>${d.massacreName}</strong><br/>`;
+      if (d.date) html += `${d.date.toLocaleDateString("pt-BR")}<br/>`;
+      html += `${nameLabel}: ${d.name}<br/>`;
+      html += `${victimsLabel}: ${d.category}<br/>`;
+      html += `${govLabel}: ${d.row.Governor}`;
       if (link) html += `<br/><a href="${link}" target="_blank">WikiFavelas</a>`;
       if (desc) html += `<br/><small>${desc}</small>`;
       if (notes) html += `<br/><small><em>${notes}</em></small>`;
@@ -564,53 +578,73 @@ function updateBarChart() {
       tooltip.style("opacity", 0);
     })
     .on("click", function (event, d) {
-      selectedMassacreBar = d.data.id;
+      selectedMassacreBar = d.massacreId;
       renderNamesList();
     });
 
-  const victimsDots = [];
-  staggered.forEach((row) => {
-    const namesArr = splitNames(row.NamesRaw);
-    namesArr.forEach((n, idx) => {
-      victimsDots.push({
-        id: row.id,
-        Date: row.Date,
-        index: idx,
-      });
-    });
+  // Color legend for victim type
+  const legend = g.append("g").attr("transform", `translate(${innerWidth - 150},10)`);
+  const legendTitle =
+    lang === "pt" ? "Cor: tipo de vítima" : "Color: victim type";
+  legend
+    .append("text")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("class", "small-label")
+    .text(legendTitle);
+
+  victimCategories.forEach((cat, i) => {
+    const y = 15 + i * 16;
+    legend
+      .append("rect")
+      .attr("x", 0)
+      .attr("y", y - 9)
+      .attr("width", 10)
+      .attr("height", 10)
+      .attr("fill", colorCatScale(cat));
+    legend
+      .append("text")
+      .attr("x", 16)
+      .attr("y", y)
+      .attr("font-size", "0.75rem")
+      .text(cat);
   });
 
-  const dotYScale = d3
-    .scaleLinear()
-    .domain([0, d3.max(victimsDots, (d) => d.index) || 1])
-    .range([innerHeight + 10, innerHeight + 40]);
+  // Zoom (horizontal)
+  const zoom = d3
+    .zoom()
+    .scaleExtent([0.5, 20])
+    .translateExtent([[0, 0], [innerWidth, innerHeight]])
+    .extent([[0, 0], [innerWidth, innerHeight]])
+    .on("zoom", (event) => {
+      const zx = event.transform.rescaleX(xScale);
+      xAxisG.call(d3.axisBottom(zx).ticks(8));
+      xAxisG
+        .selectAll("text")
+        .attr("transform", "rotate(-35)")
+        .style("text-anchor", "end")
+        .attr("fill", "#ffffff");
 
-  g.selectAll(".victim-dot")
-    .data(victimsDots)
-    .enter()
-    .append("circle")
-    .attr("class", "victim-dot")
-    .attr("cx", (d) => xScale(d.Date))
-    .attr("cy", (d) => dotYScale(d.index))
-    .attr("r", 2)
-    .attr("fill", "#ffffff")
-    .attr("opacity", 0.7);
+      points.attr("cx", (d) => zx(d.date));
+    });
+
+  scatterSvg.call(zoom);
 }
 
-// ===== NAMES LIST ABOVE BAR CHART =====
+// ===== NAMES LIST (| separated) =====
 function renderNamesList() {
   const titleEl = document.getElementById("names-title");
   const subtitleEl = document.getElementById("names-subtitle");
   const listEl = document.getElementById("names-list");
 
-  listEl.innerHTML = "";
+  listEl.textContent = "";
 
   if (selectedMassacreBar == null) {
     let allNames = [];
     dataFiltered.forEach((d) => {
       allNames = allNames.concat(splitNames(d.NamesRaw));
     });
-    allNames = Array.from(new Set(allNames)).sort();
+    allNames = Array.from(new Set(allNames));
 
     titleEl.textContent =
       lang === "pt"
@@ -618,25 +652,20 @@ function renderNamesList() {
         : "All victims (current filter)";
     subtitleEl.textContent =
       lang === "pt"
-        ? "Clique em uma barra para filtrar por massacre."
-        : "Click a bar to filter by massacre.";
+        ? "Clique em um ponto para filtrar por massacre."
+        : "Click a point to filter by massacre.";
 
-    const ul = document.createElement("ul");
-    allNames.forEach((name) => {
-      const li = document.createElement("li");
-      li.textContent = name;
-      ul.appendChild(li);
-    });
-    listEl.appendChild(ul);
+    listEl.textContent = allNames.join(" | ");
   } else {
     const row = dataFiltered.find((d) => d.id === selectedMassacreBar);
     if (!row) {
       titleEl.textContent = "";
       subtitleEl.textContent = "";
-      listEl.innerHTML = "";
+      listEl.textContent = "";
       return;
     }
     const namesArr = splitNames(row.NamesRaw);
+    const namesStr = namesArr.join(" | ");
     const massacreTitle = row.MassacreName;
     const massacreDate = row.Date
       ? row.Date.toLocaleDateString("pt-BR")
@@ -649,16 +678,10 @@ function renderNamesList() {
 
     subtitleEl.textContent =
       lang === "pt"
-        ? "Clique em outra barra para mudar o massacre ou recarregue a página para limpar o filtro."
-        : "Click another bar to change massacre or reload the page to clear.";
+        ? "Clique em outro ponto para mudar o massacre ou recarregue a página para limpar."
+        : "Click another point to change massacre or reload the page to clear.";
 
-    const ul = document.createElement("ul");
-    namesArr.forEach((name) => {
-      const li = document.createElement("li");
-      li.textContent = name;
-      ul.appendChild(li);
-    });
-    listEl.appendChild(ul);
+    listEl.textContent = namesStr;
   }
 }
 
@@ -666,6 +689,6 @@ function renderNamesList() {
 function updateVisuals() {
   updateMap();
   renderMapSidePanel();
-  updateBarChart();
+  updateScatterChart();
   renderNamesList();
 }
