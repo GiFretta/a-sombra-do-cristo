@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <title>À Sombra do Cristo / Under the Christ’s Shadow</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet (map) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <!-- D3 -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- HEADER -->
+    <header>
+      <div class="title-block">
+        <h1 id="title-main-pt">À Sombra do Cristo</h1>
+        <h1 id="title-main-en" class="hidden">Under the Christ’s Shadow</h1>
+
+        <p id="subtitle-pt">
+          Arquivo público e colaborativo das vítimas de violência no Rio
+        </p>
+        <p id="subtitle-en" class="hidden">
+          A public, collaborative archive of Rio’s victims of violence
+        </p>
+      </div>
+
+      <div class="lang-toggle">
+        <button id="btn-pt" class="lang-btn active">PT</button>
+        <button id="btn-en" class="lang-btn">EN</button>
+      </div>
+    </header>
+
+    <!-- GLOBAL FILTERS -->
+    <section class="filters-card">
+      <div class="filter-group">
+        <label id="year-label" for="year-select">Ano / Year</label>
+        <select id="year-select">
+          <option value="all">All years</option>
+          <!-- options filled by JS -->
+        </select>
+      </div>
+    </section>
+
+    <!-- MAP + SIDE PANEL -->
+    <section class="section-card">
+      <div class="section-header">
+        <h2 id="map-title-pt">Mapa de massacres na Região Metropolitana do Rio</h2>
+        <h2 id="map-title-en" class="hidden">Map of massacres in Rio’s metropolitan area</h2>
+
+        <p id="map-desc-pt">
+          Cada ponto representa um massacre. O tamanho indica o número total de vítimas; a cor indica o governador no período.
+        </p>
+        <p id="map-desc-en" class="hidden">
+          Each point represents a massacre. Point size shows total victims; color shows the governor at the time.
+        </p>
+      </div>
+
+      <div class="map-layout">
+        <div id="map"></div>
+
+        <aside class="side-panel">
+          <h3 id="map-victims-title-pt">Vítimas (clique em um ponto)</h3>
+          <h3 id="map-victims-title-en" class="hidden">Victims (click a point)</h3>
+
+          <div id="map-victims-content" class="names-box">
+            <!-- filled by JS -->
+          </div>
+
+          <div id="map-extra">
+            <!-- link + description + notes -->
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- STACKED BAR CHART + NAMES LIST -->
+    <section class="section-card">
+      <div class="section-header">
+        <h2 id="bar-title-pt">Massacres ao longo do tempo</h2>
+        <h2 id="bar-title-en" class="hidden">Massacres over time</h2>
+
+        <p id="bar-desc-pt">
+          Barras empilhadas mostram os tipos de vítimas em cada massacre.
+          Clique em uma barra para ver apenas os nomes daquele massacre.
+        </p>
+        <p id="bar-desc-en" class="hidden">
+          Stacked bars show victim types in each massacre.
+          Click a bar to see only the names from that massacre.
+        </p>
+      </div>
+
+      <div class="names-top">
+        <h3 id="names-title"></h3>
+        <p id="names-subtitle" class="small-label"></p>
+        <div id="names-list" class="names-box"></div>
+      </div>
+
+      <div id="bar-chart-container">
+        <svg id="bar-chart"></svg>
+      </div>
+    </section>
+
+    <!-- NECROPOLITICS TEXT PLACEHOLDER -->
+    <section class="section-card">
+      <h2 id="necro-title-pt">À sombra do Cristo: necropolítica e memória</h2>
+      <h2 id="necro-title-en" class="hidden">Under the Christ’s Shadow: necropolitics and memory</h2>
+
+      <p id="necro-text-pt" class="placeholder">
+        (Espaço reservado para o texto em que você irá discutir a necropolítica de Estado e a forma como os nomes aparecem e desaparecem.)
+      </p>
+      <p id="necro-text-en" class="placeholder hidden">
+        (Space reserved for your text discussing state necropolitics and how names appear and disappear.)
+      </p>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
