@@ -1,11 +1,16 @@
 // ===== GLOBAL STATE =====
 let dataAll = [];
-let dataFiltered = [];
+let dataTextFiltered = [];   // after massacre/date + victim filters
+let dataMapFiltered = [];    // text filters + year + governor
+
 let lang = "pt";
 let selectedMassacreMap = null;
 let selectedMassacreBar = null;
 
-let yearFilter = "all";
+// filters
+let massacreFilterText = "";
+let victimFilterText = "";
+let mapYearFilter = "all";
 let governorFilter = "all";
 
 const victimCategories = [
@@ -37,6 +42,7 @@ function setLanguage(newLang) {
     document.getElementById(enId).classList.toggle("hidden", showPT);
   });
 
+  // labels / placeholders
   document.getElementById("year-label").textContent =
     lang === "pt" ? "Ano" : "Year";
 
@@ -53,6 +59,20 @@ function setLanguage(newLang) {
     govSelect.options[0].text =
       lang === "pt" ? "Todos os Governadores" : "All Governors";
   }
+
+  document.getElementById("massacre-filter-label").textContent =
+    lang === "pt" ? "Massacre / Data" : "Massacre / Date";
+  document.getElementById("filter-massacre").placeholder =
+    lang === "pt"
+      ? "Filtrar por massacre ou data"
+      : "Filter by massacre or date";
+
+  document.getElementById("victim-filter-label").textContent =
+    lang === "pt" ? "Nome da vítima" : "Victim name";
+  document.getElementById("filter-victim").placeholder =
+    lang === "pt"
+      ? "Filtrar por nome da vítima"
+      : "Filter by victim name";
 
   const clearBtn = document.getElementById("clear-map-selection");
   clearBtn.textContent =
@@ -88,17 +108,36 @@ function splitNames(namesStr) {
 }
 
 function getLinkFromCsvRow(row) {
-  return (
-    row["WikiFavelas Source Link"] ||
-    row["Link WikiFavelas"] ||
-    row["WikiFavela Link"] ||
-    ""
-  );
+  // new column name
+  return row["WikiFavelas Source Link"] || "";
 }
 
-function applyFilters() {
-  dataFiltered = dataAll.filter((d) => {
-    const yearOk = yearFilter === "all" || d.Year === yearFilter;
+// ===== FILTERING =====
+function applyTextFilters() {
+  const m = massacreFilterText.trim().toLowerCase();
+  const v = victimFilterText.trim().toLowerCase();
+
+  dataTextFiltered = dataAll.filter((d) => {
+    let okM = true;
+    let okV = true;
+
+    if (m) {
+      const dateStr = d.Date ? d.Date.toLocaleDateString("pt-BR") : "";
+      const combined = `${d.MassacreName} ${dateStr}`.toLowerCase();
+      okM = combined.includes(m);
+    }
+
+    if (v) {
+      okV = (d.NamesRaw || "").toLowerCase().includes(v);
+    }
+
+    return okM && okV;
+  });
+}
+
+function applyMapFilters() {
+  dataMapFiltered = dataTextFiltered.filter((d) => {
+    const yearOk = mapYearFilter === "all" || d.Year === mapYearFilter;
     const govOk = governorFilter === "all" || d.Governor === governorFilter;
     return yearOk && govOk;
   });
@@ -116,9 +155,9 @@ d3.csv("Massacres in Rio de Janeiro 1990-2025 - English.csv").then((data) => {
       Year: year,
       Latitude: +d["Latitude"],
       Longitude: +d["Longitude"],
-      MassacreName: d["Massacre Name"] || d["Massacre"] || `Massacre ${idx + 1}`,
+      MassacreName: d["Massacre Name"] || `Massacre ${idx + 1}`,
       NamesRaw: d["Names"] || "",
-      Governor: d["State Governor at the Time"] || d["Governor"] || "Unknown",
+      Governor: d["State Governor at the Time"] || "Unknown",
       TotalVictims: +d["Total Victimis"] || 0,
       "Enforced Dissapearances": +d["Enforced Dissapearances"] || 0,
       "Victims of State/Police Action": +d["Victims of State/Police Action"] || 0,
@@ -133,8 +172,10 @@ d3.csv("Massacres in Rio de Janeiro 1990-2025 - English.csv").then((data) => {
   });
 
   applySpatialJitter(dataAll);
-  applyFilters();
+  applyTextFilters();
+  applyMapFilters();
 
+  initTopFilters();
   populateYearSelect();
   populateGovernorSelect();
   initMapLeaflet();
@@ -143,7 +184,31 @@ d3.csv("Massacres in Rio de Janeiro 1990-2025 - English.csv").then((data) => {
   setLanguage("pt");
 });
 
-// ===== FILTER CONTROLS =====
+// ===== TOP FILTER INPUTS =====
+function initTopFilters() {
+  const massacreInput = document.getElementById("filter-massacre");
+  const victimInput = document.getElementById("filter-victim");
+
+  massacreInput.addEventListener("input", () => {
+    massacreFilterText = massacreInput.value.toLowerCase();
+    selectedMassacreMap = null;
+    selectedMassacreBar = null;
+    applyTextFilters();
+    applyMapFilters();
+    updateVisuals();
+  });
+
+  victimInput.addEventListener("input", () => {
+    victimFilterText = victimInput.value.toLowerCase();
+    selectedMassacreMap = null;
+    selectedMassacreBar = null;
+    applyTextFilters();
+    applyMapFilters();
+    updateVisuals();
+  });
+}
+
+// ===== YEAR + GOVERNOR FILTERS (MAP ONLY) =====
 function populateYearSelect() {
   const select = document.getElementById("year-select");
   const yearsSet = new Set(
@@ -162,10 +227,9 @@ function populateYearSelect() {
 
   select.addEventListener("change", () => {
     const val = select.value;
-    yearFilter = val === "all" ? "all" : +val;
+    mapYearFilter = val === "all" ? "all" : +val;
     selectedMassacreMap = null;
-    selectedMassacreBar = null;
-    applyFilters();
+    applyMapFilters();
     updateVisuals();
   });
 }
@@ -186,8 +250,7 @@ function populateGovernorSelect() {
     const val = select.value;
     governorFilter = val === "all" ? "all" : val;
     selectedMassacreMap = null;
-    selectedMassacreBar = null;
-    applyFilters();
+    applyMapFilters();
     updateVisuals();
   });
 }
@@ -230,7 +293,7 @@ function initMapLeaflet() {
     scrollWheelZoom: true,
   });
 
-  // Light, simple basemap (similar to style JSON you sent)
+  // Light, simple basemap
   L.tileLayer(
     "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
     {
@@ -261,7 +324,7 @@ function initMapLeaflet() {
 function updateMap() {
   circlesLayer.clearLayers();
 
-  dataFiltered.forEach((d) => {
+  dataMapFiltered.forEach((d) => {
     if (!d.Latitude || !d.Longitude) return;
 
     const radius =
@@ -280,16 +343,12 @@ function updateMap() {
 
     const victimsLabel = lang === "pt" ? "Vítimas" : "Victims";
     const govLabel = lang === "pt" ? "Governador" : "Governor";
-    const desc = lang === "pt" ? d.DescriptionPT : d.DescriptionEN;
-    const notes = lang === "pt" ? d.NotesPT : d.NotesEN;
     const link = d.LinkWiki;
 
     let html = `<strong>${d.MassacreName}</strong><br/>`;
     if (d.Date) html += `${d.Date.toLocaleDateString("pt-BR")}<br/>`;
     html += `${victimsLabel}: ${d.TotalVictims}<br/>${govLabel}: ${d.Governor}`;
     if (link) html += `<br/><a href="${link}" target="_blank">WikiFavelas</a>`;
-    if (desc) html += `<br/><small>${desc}</small>`;
-    if (notes) html += `<br/><small><em>${notes}</em></small>`;
 
     circle.bindTooltip(html, {
       direction: "top",
@@ -373,7 +432,7 @@ function renderMapSidePanel() {
     return;
   }
 
-  const row = dataFiltered.find((d) => d.id === selectedMassacreMap);
+  const row = dataMapFiltered.find((d) => d.id === selectedMassacreMap);
   if (!row) {
     container.textContent =
       lang === "pt" ? "Massacre não encontrado." : "Massacre not found.";
@@ -386,7 +445,7 @@ function renderMapSidePanel() {
   }`;
 
   const namesArr = splitNames(row.NamesRaw);
-  const namesStr = namesArr.join(" | ");
+  const namesStr = namesArr.join(" · ");
 
   const namesDiv = document.createElement("div");
   namesDiv.textContent = namesStr;
@@ -395,30 +454,20 @@ function renderMapSidePanel() {
   container.appendChild(namesDiv);
 
   const link = row.LinkWiki;
-  const desc = lang === "pt" ? row.DescriptionPT : row.DescriptionEN;
-  const notes = lang === "pt" ? row.NotesPT : row.NotesEN;
-
-  let html = "";
   if (link) {
-    html +=
+    const html =
       lang === "pt"
         ? `<p><a href="${link}" target="_blank">Ver mais na WikiFavelas</a></p>`
         : `<p><a href="${link}" target="_blank">See more on WikiFavelas</a></p>`;
+    extra.innerHTML = html;
   }
-  if (desc) {
-    html += `<h4>${lang === "pt" ? "Descrição" : "Description"}</h4><p>${desc}</p>`;
-  }
-  if (notes) {
-    html += `<h4>${lang === "pt" ? "Observações" : "Notes"}</h4><p>${notes}</p>`;
-  }
-  extra.innerHTML = html;
 }
 
-// ===== SCATTER PLOT: 1 DOT PER VICTIM =====
+// ===== SCATTER PLOT: UNIT DOT GRAPH (1 DOT PER VICTIM) =====
 let scatterSvg;
 let scatterWidth = 900;
 let scatterHeight = 400;
-let xScale, yScale, colorCatScale;
+let xScale, colorCatScale;
 
 function initScatterChart() {
   scatterSvg = d3.select("#bar-chart");
@@ -433,24 +482,22 @@ function initScatterChart() {
 function buildVictimPoints() {
   const victims = [];
 
-  dataFiltered.forEach((row) => {
+  dataTextFiltered.forEach((row) => {
     if (!row.Date) return;
 
-    const names = splitNames(row.NamesRaw);
-    const totalNames = names.length || 1;
-
+    let stackIndex = 0;
     victimCategories.forEach((cat) => {
       const count = row[cat] || 0;
       for (let i = 0; i < count; i++) {
-        const name = names[i % totalNames];
         victims.push({
           massacreId: row.id,
           date: row.Date,
           category: cat,
-          name,
+          stackIndex,
           massacreName: row.MassacreName,
           row,
         });
+        stackIndex += 1;
       }
     });
   });
@@ -461,7 +508,7 @@ function buildVictimPoints() {
 function updateScatterChart() {
   scatterSvg.selectAll("*").remove();
 
-  const margin = { top: 20, right: 20, bottom: 60, left: 80 };
+  const margin = { top: 20, right: 20, bottom: 60, left: 40 };
   const innerWidth = scatterWidth - margin.left - margin.right;
   const innerHeight = scatterHeight - margin.top - margin.bottom;
 
@@ -486,14 +533,10 @@ function updateScatterChart() {
   const dates = victimPoints.map((d) => d.date);
   xScale = d3.scaleTime().domain(d3.extent(dates)).range([0, innerWidth]).nice();
 
-  yScale = d3
-    .scaleBand()
-    .domain(victimCategories)
-    .range([innerHeight, 0])
-    .padding(0.4);
+  const maxStack = d3.max(victimPoints, (d) => d.stackIndex) || 1;
+  const dotSpacing = Math.max(3, innerHeight / (maxStack + 5));
 
   const xAxis = d3.axisBottom(xScale).ticks(8);
-  const yAxis = d3.axisLeft(yScale);
 
   const xAxisG = g
     .append("g")
@@ -507,6 +550,9 @@ function updateScatterChart() {
     .style("text-anchor", "end")
     .attr("fill", "#ffffff");
 
+  g.selectAll(".x-axis .domain, .x-axis .tick line").attr("stroke", "#888");
+
+  // x-axis label
   g.append("text")
     .attr("x", innerWidth / 2)
     .attr("y", innerHeight + 45)
@@ -514,16 +560,7 @@ function updateScatterChart() {
     .attr("class", "small-label")
     .text(lang === "pt" ? "Data do massacre" : "Date of massacre");
 
-  const yAxisG = g.append("g").attr("class", "y-axis").call(yAxis);
-
-  yAxisG.selectAll("text").attr("fill", "#ffffff");
-  yAxisG.selectAll(".domain, .tick line").attr("stroke", "#888");
-
-  g.append("text")
-    .attr("x", -margin.left + 5)
-    .attr("y", -6)
-    .attr("class", "small-label")
-    .text(lang === "pt" ? "Tipo de vítima" : "Victim type");
+  // no y-axis drawn (unit dot stacks only)
 
   const tooltip = d3
     .select("body")
@@ -540,30 +577,22 @@ function updateScatterChart() {
     .append("circle")
     .attr("class", "victim-point")
     .attr("cx", (d) => xScale(d.date))
-    .attr("cy", (d) => {
-      const base = yScale(d.category) + yScale.bandwidth() / 2;
-      const jitter = (Math.random() - 0.5) * yScale.bandwidth() * 0.6;
-      return base + jitter;
-    })
+    .attr("cy", (d) => innerHeight - d.stackIndex * dotSpacing)
     .attr("r", 3)
     .attr("fill", (d) => colorCatScale(d.category))
-    .attr("opacity", 0.8)
+    .attr("opacity", 0.85)
     .on("mouseover", function (event, d) {
       const victimsLabel = lang === "pt" ? "Vítima" : "Victim";
       const govLabel = lang === "pt" ? "Governador" : "Governor";
-      const nameLabel = lang === "pt" ? "Nome" : "Name";
-      const desc = lang === "pt" ? d.row.DescriptionPT : d.row.DescriptionEN;
-      const notes = lang === "pt" ? d.row.NotesPT : d.row.NotesEN;
+      const typeLabel = lang === "pt" ? "Tipo" : "Type";
       const link = d.row.LinkWiki;
 
       let html = `<strong>${d.massacreName}</strong><br/>`;
       if (d.date) html += `${d.date.toLocaleDateString("pt-BR")}<br/>`;
-      html += `${nameLabel}: ${d.name}<br/>`;
       html += `${victimsLabel}: ${d.category}<br/>`;
+      html += `${typeLabel}: ${d.category}<br/>`;
       html += `${govLabel}: ${d.row.Governor}`;
       if (link) html += `<br/><a href="${link}" target="_blank">WikiFavelas</a>`;
-      if (desc) html += `<br/><small>${desc}</small>`;
-      if (notes) html += `<br/><small><em>${notes}</em></small>`;
 
       tooltip.html(html).style("opacity", 0.95);
     })
@@ -581,7 +610,7 @@ function updateScatterChart() {
     });
 
   // Legend for victim type colors
-  const legend = g.append("g").attr("transform", `translate(${innerWidth - 150},10)`);
+  const legend = g.append("g").attr("transform", `translate(${innerWidth - 170},10)`);
   const legendTitle =
     lang === "pt" ? "Cor: tipo de vítima" : "Color: victim type";
   legend
@@ -589,6 +618,7 @@ function updateScatterChart() {
     .attr("x", 0)
     .attr("y", 0)
     .attr("class", "small-label")
+    .attr("fill", "#ffffff")
     .text(legendTitle);
 
   victimCategories.forEach((cat, i) => {
@@ -605,6 +635,7 @@ function updateScatterChart() {
       .attr("x", 16)
       .attr("y", y)
       .attr("font-size", "0.75rem")
+      .attr("fill", "#ffffff")
       .text(cat);
   });
 
@@ -622,6 +653,7 @@ function updateScatterChart() {
         .attr("transform", "rotate(-35)")
         .style("text-anchor", "end")
         .attr("fill", "#ffffff");
+      xAxisG.selectAll(".domain, .tick line").attr("stroke", "#888");
 
       points.attr("cx", (d) => zx(d.date));
     });
@@ -629,7 +661,7 @@ function updateScatterChart() {
   scatterSvg.call(zoom);
 }
 
-// ===== NAMES LIST (| separated) =====
+// ===== NAMES LIST (· separated) =====
 function renderNamesList() {
   const titleEl = document.getElementById("names-title");
   const subtitleEl = document.getElementById("names-subtitle");
@@ -639,7 +671,7 @@ function renderNamesList() {
 
   if (selectedMassacreBar == null) {
     let allNames = [];
-    dataFiltered.forEach((d) => {
+    dataTextFiltered.forEach((d) => {
       allNames = allNames.concat(splitNames(d.NamesRaw));
     });
     allNames = Array.from(new Set(allNames));
@@ -653,9 +685,9 @@ function renderNamesList() {
         ? "Clique em um ponto para filtrar por massacre."
         : "Click a point to filter by massacre.";
 
-    listEl.textContent = allNames.join(" | ");
+    listEl.textContent = allNames.join(" · ");
   } else {
-    const row = dataFiltered.find((d) => d.id === selectedMassacreBar);
+    const row = dataTextFiltered.find((d) => d.id === selectedMassacreBar);
     if (!row) {
       titleEl.textContent = "";
       subtitleEl.textContent = "";
@@ -663,7 +695,7 @@ function renderNamesList() {
       return;
     }
     const namesArr = splitNames(row.NamesRaw);
-    const namesStr = namesArr.join(" | ");
+    const namesStr = namesArr.join(" · ");
     const massacreTitle = row.MassacreName;
     const massacreDate = row.Date
       ? row.Date.toLocaleDateString("pt-BR")
