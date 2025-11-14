@@ -118,17 +118,29 @@ header {
 .filters-card {
   display: flex;
   gap: 1rem;
-  align-items: center;
+  flex-wrap: wrap;
 }
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-group.full-width {
+  flex: 1 1 260px;
+}
+
 .filter-group label {
   display: block;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted);
+  margin-bottom: 0.15rem;
 }
-.filter-group select {
-  margin-top: 0.2rem;
+
+.filter-group select,
+.filter-group input {
   padding: 0.25rem 0.5rem;
   background-color: var(--names-bg);
   color: #fff;
@@ -136,9 +148,12 @@ header {
   border: 1px solid var(--card-border);
 }
 
-/* MAP LAYOUT */
+/* MAP FILTERS */
 .map-filters {
   margin: 0.3rem 0 0.5rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .map-layout {
@@ -198,8 +213,11 @@ header {
   max-height: 230px;
   overflow-y: auto;
   font-size: 0.9rem;
+  text-align: justify;
+  text-align-last: left;
 }
 
+/* Small labels (axis, legends) */
 .small-label {
   font-size: 0.8rem;
   text-transform: uppercase;
