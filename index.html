@@ -55,11 +55,9 @@
     <section class="filters-card">
       <div class="filter-group full-width">
         <label id="massacre-filter-label" for="filter-massacre">Massacre / Data</label>
-        <input
-          id="filter-massacre"
-          type="text"
-          placeholder="Filtrar por massacre ou data"
-        />
+        <select id="filter-massacre">
+          <option value="all">Todos os massacres</option>
+        </select>
       </div>
       <div class="filter-group full-width">
         <label id="victim-filter-label" for="filter-victim">Nome da vítima</label>
@@ -68,6 +66,7 @@
           type="text"
           placeholder="Filtrar por nome da vítima"
         />
+        <div id="victim-matches" class="filter-matches"></div>
       </div>
     </section>
 
@@ -134,6 +133,7 @@
       <div class="names-top">
         <h3 id="names-title"></h3>
         <p id="names-subtitle" class="small-label"></p>
+        <button id="clear-scatter-selection" class="clear-btn clear-btn--inline"></button>
         <div id="names-list" class="names-box"></div>
       </div>
 

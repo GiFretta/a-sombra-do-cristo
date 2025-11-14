@@ -148,6 +148,23 @@ header {
   border: 1px solid var(--card-border);
 }
 
+.filter-matches {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  max-height: 110px;
+  overflow-y: auto;
+  background-color: rgba(43, 36, 37, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  line-height: 1.4;
+}
+
+.filter-matches strong {
+  color: #ffffff;
+}
+
 /* MAP FILTERS */
 .map-filters {
   margin: 0.3rem 0 0.5rem;
@@ -205,6 +222,20 @@ header {
   background-color: var(--mid-1);
 }
 
+.clear-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.clear-btn:disabled:hover {
+  background-color: transparent;
+}
+
+.clear-btn--inline {
+  align-self: flex-start;
+  margin-bottom: 0.6rem;
+}
+
 .names-box {
   background-color: var(--names-bg);
   border-radius: 8px;
@@ -223,11 +254,19 @@ header {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #ffffff; /* axis labels white */
+  fill: #ffffff;
 }
 
 #map-extra {
   margin-top: 0.8rem;
   font-size: 0.9rem;
+}
+
+.map-description {
+  margin-top: 0.6rem;
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 /* NAMES + SCATTER */
@@ -243,6 +282,22 @@ header {
 #bar-chart {
   width: 100%;
   height: 420px;
+  min-width: 980px;
+}
+
+.victim-point {
+  stroke: transparent;
+  stroke-width: 1.2px;
+}
+
+.victim-point.is-selected {
+  stroke: #ffffff;
+  stroke-width: 2px;
+  opacity: 1 !important;
+}
+
+.victim-point.is-dimmed {
+  opacity: 0.25 !important;
 }
 
 /* NECROPOLITICS */
